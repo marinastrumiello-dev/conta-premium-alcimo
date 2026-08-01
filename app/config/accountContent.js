@@ -405,7 +405,7 @@ export const accountContent = {
       'Benefícios especiais, experiências exclusivas e novidades reservadas aos membros.',
 
     buttonLabel: 'Conhecer o programa',
-    buttonHref: '/account#programa-alcimo',
+    buttonHref: '/account/ambassador',
 
     progress: {
       enabled: false,
