@@ -113,15 +113,40 @@ export function subscribeToFavoritesChanged(callback) {
   };
 }
 
+const STORE_FAVORITES_RETURN_PARAMETER = 'favoritesSync';
+
 /**
- * Compatibilidade temporária para links antigos da Área do Cliente.
- * A lista de favoritos não é mais anexada em todas as URLs da loja.
+ * Monta uma URL da loja levando a fotografia mais recente dos favoritos
+ * da Área do Cliente. A loja consome o parâmetro `favoritesSync`, atualiza
+ * o localStorage e remove o parâmetro da barra de endereço em seguida.
+ *
+ * Isso é necessário porque `conta.alcimo.com` e `alcimo.com` são origens
+ * diferentes e, portanto, não compartilham sessionStorage/localStorage.
  */
-export function buildStoreSyncUrl(destination) {
-  return destination || '#';
+export function buildStoreSyncUrl(destination, favoriteIds) {
+  if (!destination) return '#';
+  if (typeof window === 'undefined') return destination;
+
+  const normalizedIds = normalizeFavoriteIds(
+    Array.isArray(favoriteIds)
+      ? favoriteIds
+      : readAccountFavoriteIds(),
+  );
+
+  try {
+    const destinationUrl = new URL(destination, window.location.origin);
+    destinationUrl.searchParams.set(
+      STORE_FAVORITES_RETURN_PARAMETER,
+      JSON.stringify(normalizedIds),
+    );
+
+    return destinationUrl.toString();
+  } catch {
+    return destination;
+  }
 }
 
-export function handleStoreNavigation(event, destination) {
+export function handleStoreNavigation(event, destination, favoriteIds) {
   if (!destination || typeof window === 'undefined') return;
 
   if (
@@ -136,5 +161,7 @@ export function handleStoreNavigation(event, destination) {
   }
 
   event.preventDefault();
-  window.location.assign(destination);
+  window.location.assign(
+    buildStoreSyncUrl(destination, favoriteIds),
+  );
 }

@@ -1,0 +1,16 @@
+CORREÇÃO — FAVORITOS AO RETORNAR PARA A LOJA
+
+Arquivo alterado:
+app/lib/favoritesSync.js
+
+Causa:
+O portal salvava corretamente a remoção na conta, mas voltava para alcimo.com
+sem enviar a fotografia atualizada dos favoritos. Como loja e portal usam
+origens diferentes, o storage não é compartilhado entre os dois domínios.
+
+Correção:
+Toda navegação do portal para a loja passa a incluir temporariamente:
+?favoritesSync=[...]
+
+O header da loja já possui a rotina que recebe esse parâmetro, atualiza o
+localStorage e limpa a URL.
