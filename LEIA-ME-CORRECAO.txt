@@ -1,0 +1,16 @@
+ALCIMO & CO. — Correção de sincronização dos Favoritos
+
+Arquivo alterado:
+app/routes/($locale).account.jsx
+
+Diagnóstico:
+Após remover um favorito, a action devolvia a lista correta e o navegador atualizava o sessionStorage. Porém, o layout pai da conta era revalidado imediatamente. A Customer Account API podia devolver por alguns instantes a fotografia anterior do metafield, fazendo o AccountSidebar sobrescrever a lista nova com a antiga. Ao retornar para alcimo.com, a lista antiga era enviada e o contador não diminuía.
+
+Correção:
+A revalidação do loader pai é ignorada somente para mutations em /account/favorites. Todas as outras rotas e ações continuam usando a revalidação padrão.
+
+Alterações anteriores confirmadas no ZIP analisado:
+- app/config/accountContent.js aponta Programa ALCIMO para /account/ambassador
+- app/routes/($locale).account._index.jsx redireciona #programa-alcimo
+- app/lib/favoritesSync.js exporta dispatchFavoritesChanged
+- buildStoreSyncUrl envia favoritesSync para a loja

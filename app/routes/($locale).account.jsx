@@ -2,8 +2,40 @@ import {data as remixData, Outlet, useLoaderData} from 'react-router';
 import {AccountSidebar} from '~/components/account/AccountSidebar';
 import {CUSTOMER_DETAILS_QUERY} from '~/graphql/customer-account/CustomerDetailsQuery';
 
-export function shouldRevalidate() {
-  return true;
+export function shouldRevalidate({
+  formAction,
+  formMethod,
+  defaultShouldRevalidate,
+}) {
+  /*
+   * O toggle de Favoritos já devolve a lista atualizada na resposta da action
+   * e sincroniza o estado no navegador por evento. Revalidar o loader pai logo
+   * depois pode trazer, por alguns instantes, o metafield anterior da Customer
+   * Account API e sobrescrever a lista recém-atualizada no sessionStorage.
+   *
+   * Portanto, mantemos o estado local confirmado pela action apenas para essa
+   * mutation. Todas as outras navegações e ações continuam usando a regra
+   * normal de revalidação do React Router.
+   */
+  if (
+    formMethod?.toUpperCase() !== 'GET' &&
+    typeof formAction === 'string'
+  ) {
+    try {
+      const actionPath = new URL(
+        formAction,
+        'https://conta.alcimo.com',
+      ).pathname;
+
+      if (actionPath.endsWith('/account/favorites')) {
+        return false;
+      }
+    } catch {
+      // Em caso de URL inesperada, preserva o comportamento padrão.
+    }
+  }
+
+  return defaultShouldRevalidate;
 }
 
 /**
