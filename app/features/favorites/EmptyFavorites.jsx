@@ -1,6 +1,30 @@
 import {Link} from 'react-router';
+import {
+  buildStoreSyncUrl,
+  handleStoreNavigation,
+} from '~/lib/favoritesSync';
+
+const ALCIMO_COLLECTION_URL = 'https://alcimo.com/collections/all';
 
 export function EmptyFavorites() {
+  /*
+   * Esta tela só é renderizada quando a lista já está vazia.
+   * Enviamos [] explicitamente para que a loja apague a fotografia
+   * anterior do localStorage e zere o contador do cabeçalho.
+   */
+  const storeReturnUrl = buildStoreSyncUrl(
+    ALCIMO_COLLECTION_URL,
+    [],
+  );
+
+  function handleCollectionClick(event) {
+    handleStoreNavigation(
+      event,
+      ALCIMO_COLLECTION_URL,
+      [],
+    );
+  }
+
   return (
     <section className="mt-10 flex min-h-[420px] animate-[fadeIn_.45s_ease-out] flex-col items-center justify-center rounded-[12px] border border-neutral-200 bg-white px-6 text-center">
       <div className="flex h-16 w-16 items-center justify-center rounded-full border border-neutral-200">
@@ -18,7 +42,8 @@ export function EmptyFavorites() {
       </p>
 
       <a
-        href="https://alcimo.com/collections/all"
+        href={storeReturnUrl}
+        onClick={handleCollectionClick}
         className="mt-8 inline-flex min-h-12 items-center justify-center rounded-[5px] bg-neutral-950 px-8 text-[10px] uppercase tracking-[0.15em] !text-white no-underline transition hover:bg-neutral-800"
       >
         Conhecer a coleção

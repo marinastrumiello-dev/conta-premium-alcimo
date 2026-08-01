@@ -1,4 +1,10 @@
 import {useEffect} from 'react';
+import {
+  buildStoreSyncUrl,
+  handleStoreNavigation,
+} from '~/lib/favoritesSync';
+
+const ALCIMO_COLLECTION_URL = 'https://alcimo.com/collections/all';
 
 export function FavoritesToast({
   toast,
@@ -20,6 +26,17 @@ export function FavoritesToast({
 
   const isError =
     toast.type === 'error';
+
+  const storeReturnUrl = buildStoreSyncUrl(
+    ALCIMO_COLLECTION_URL,
+  );
+
+  function handleContinueShopping(event) {
+    handleStoreNavigation(
+      event,
+      ALCIMO_COLLECTION_URL,
+    );
+  }
 
   return (
     <div
@@ -56,7 +73,8 @@ export function FavoritesToast({
 
           {!isError && (
             <a
-              href="https://alcimo.com/collections/all"
+              href={storeReturnUrl}
+              onClick={handleContinueShopping}
               className="mt-3 inline-block text-[9px] uppercase tracking-[0.14em] !text-neutral-950 underline underline-offset-4"
             >
               Continuar explorando
