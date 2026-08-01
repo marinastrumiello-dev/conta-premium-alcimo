@@ -1,4 +1,5 @@
-import {useOutletContext} from 'react-router';
+import {useEffect} from 'react';
+import {useNavigate, useOutletContext} from 'react-router';
 import {AccountSupport} from '~/components/account/AccountSupport';
 import {BenefitsGrid} from '~/components/account/BenefitsGrid';
 import {CollectionBanner} from '~/components/account/CollectionBanner';
@@ -8,8 +9,15 @@ import {LoyaltyCard} from '~/components/account/LoyaltyCard';
 import {QuickAccess} from '~/components/account/QuickAccess';
 
 export default function AccountDashboard() {
+  const navigate = useNavigate();
   const {customer} = useOutletContext();
   const lastOrder = customer?.orders?.nodes?.[0] || null;
+
+  useEffect(() => {
+    if (window.location.hash === '#programa-alcimo') {
+      navigate('/account/ambassador', {replace: true});
+    }
+  }, [navigate]);
 
   return (
     <div className="space-y-8 pb-6 lg:space-y-10">

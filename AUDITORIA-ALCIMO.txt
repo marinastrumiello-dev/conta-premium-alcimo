@@ -1,0 +1,14 @@
+ALCIMO — AUDITORIA DE NAVEGAÇÃO E FAVORITOS
+
+1. O erro do Oxygen mostrado na implantação antiga dizia que dispatchFavoritesChanged não era exportado.
+2. No ZIP oficial atual, app/lib/favoritesSync.js já exporta dispatchFavoritesChanged corretamente.
+3. app/features/favorites/FavoriteButton.jsx importa essa função corretamente.
+4. Portanto, a falha exibida pertence a um commit antigo, não ao código atual.
+5. Foi corrigido o link legado /account#programa-alcimo para /account/ambassador.
+6. Foi adicionada compatibilidade no navegador para redirecionar links antigos com #programa-alcimo.
+
+Arquivos incluídos:
+- app/config/accountContent.js (corrigido)
+- app/routes/($locale).account._index.jsx (corrigido)
+- app/lib/favoritesSync.js (versão oficial auditada)
+- app/features/favorites/FavoriteButton.jsx (versão oficial auditada)
