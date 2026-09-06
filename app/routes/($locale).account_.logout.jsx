@@ -1,7 +1,6 @@
 import {redirect} from 'react-router';
 
-const LOGOUT_COMPLETE_URL =
-  'https://conta.alcimo.com/account/logout-complete';
+const LOGOUT_COMPLETE_PATH = '/account/logout-complete';
 
 // Evita que uma visita GET a /account/logout tente executar o logout.
 export async function loader() {
@@ -17,7 +16,7 @@ export async function loader() {
  */
 export async function action({context}) {
   return context.customerAccount.logout({
-    postLogoutRedirectUri: LOGOUT_COMPLETE_URL,
+    postLogoutRedirectUri: LOGOUT_COMPLETE_PATH,
   });
 }
 
