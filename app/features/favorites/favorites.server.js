@@ -11,6 +11,7 @@ import {
   FAVORITES_NAMESPACE,
   FAVORITES_TYPE,
   addFavoriteProduct,
+  createCustomerFavoritesScope,
   isShopifyProductId,
   parseFavoriteIds,
   stringifyFavoriteIds,
@@ -42,6 +43,23 @@ export async function favoritesLoader({
    */
   if (storeSync !== null) {
     const customer = await getCustomerWithFavorites(customerAccount);
+    const expectedScope = createCustomerFavoritesScope(customer.id);
+
+    /*
+     * Impede que o cache local de uma conta anterior seja sincronizado
+     * para outro cliente que entrou no mesmo navegador. Favoritos anônimos
+     * (guest) ainda podem ser mesclados na primeira autenticação.
+     */
+    const isGuestMerge =
+      storeSync.mode === 'merge' &&
+      (!storeSync.scope || storeSync.scope === 'guest');
+
+    const scopeMatchesCustomer =
+      Boolean(storeSync.scope) && storeSync.scope === expectedScope;
+
+    if (!isGuestMerge && !scopeMatchesCustomer) {
+      return redirect('/account/favorites');
+    }
 
     const currentFavoriteIds = parseFavoriteIds(customer.favorites?.value);
 
@@ -155,15 +173,30 @@ export async function favoritesLoader({
    * Mantém a mesma ordem em que os IDs
    * estão salvos no metafield.
    */
-  const products = favoriteIds
-    .map((favoriteId) =>
-      productsById.get(favoriteId),
-    )
+  const validFavoriteIds = favoriteIds.filter((favoriteId) =>
+    productsById.has(favoriteId),
+  );
+
+  const products = validFavoriteIds
+    .map((favoriteId) => productsById.get(favoriteId))
     .filter(Boolean);
+
+  /*
+   * Se um produto foi excluído ou deixou de existir na Storefront API,
+   * removemos o ID órfão do metafield do cliente. Assim o contador nunca
+   * exibe um favorito sem produto correspondente.
+   */
+  if (!areFavoriteListsEqual(favoriteIds, validFavoriteIds)) {
+    await saveCustomerFavorites({
+      customerAccount,
+      customerId: customer.id,
+      favoriteIds: validFavoriteIds,
+    });
+  }
 
   return createLoaderResponse({
     products,
-    favoriteIds,
+    favoriteIds: validFavoriteIds,
     productSaved:
       requestUrl.searchParams.get(
         'saved',
@@ -284,18 +317,19 @@ function getStoreSync(requestUrl) {
   const rawValue = requestUrl.searchParams.get(mode);
 
   if (!rawValue) {
-    return {mode, favoriteIds: []};
+    return {mode, scope: String(requestUrl.searchParams.get('scope') || ''), favoriteIds: []};
   }
 
   try {
     const parsedValue = JSON.parse(rawValue);
 
     if (!Array.isArray(parsedValue)) {
-      return {mode, favoriteIds: []};
+      return {mode, scope: String(requestUrl.searchParams.get('scope') || ''), favoriteIds: []};
     }
 
     return {
       mode,
+      scope: String(requestUrl.searchParams.get('scope') || ''),
       favoriteIds: [
         ...new Set(
           parsedValue
@@ -306,7 +340,7 @@ function getStoreSync(requestUrl) {
     };
   } catch (error) {
     console.error('Favorites sync parse error:', error);
-    return {mode, favoriteIds: []};
+    return {mode, scope: String(requestUrl.searchParams.get('scope') || ''), favoriteIds: []};
   }
 }
 

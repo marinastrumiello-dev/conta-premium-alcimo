@@ -1,7 +1,13 @@
+import {createCustomerFavoritesScope} from '~/lib/favorites';
+
 const ACCOUNT_FAVORITES_STORAGE_KEY = 'alcimo:account-favorites';
+const ACTIVE_SCOPE_SESSION_KEY = 'alcimo:account-favorites:active-scope';
+const FAVORITES_SCOPE_COOKIE = 'alcimo_customer_scope';
 const FAVORITES_EVENT = 'alcimo:favorites-changed';
 const FAVORITES_CHANNEL = 'alcimo:favorites';
 const SHOPIFY_PRODUCT_GID_PREFIX = 'gid://shopify/Product/';
+const STORE_FAVORITES_RETURN_PARAMETER = 'favoritesSync';
+const STORE_FAVORITES_SCOPE_PARAMETER = 'favoritesScope';
 
 export function normalizeFavoriteIds(favoriteIds) {
   if (!Array.isArray(favoriteIds)) return [];
@@ -17,14 +23,68 @@ export function normalizeFavoriteIds(favoriteIds) {
   ];
 }
 
-export function readAccountFavoriteIds(fallbackIds = []) {
+export function activateCustomerFavoritesScope(customerId) {
+  if (typeof window === 'undefined') {
+    return createCustomerFavoritesScope(customerId);
+  }
+
+  const scope = createCustomerFavoritesScope(customerId);
+  if (!scope) return '';
+
+  try {
+    window.sessionStorage.setItem(ACTIVE_SCOPE_SESSION_KEY, scope);
+  } catch {
+    // Continua funcionando mesmo sem sessionStorage.
+  }
+
+  try {
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    document.cookie = `${FAVORITES_SCOPE_COOKIE}=${encodeURIComponent(scope)}; Path=/; Domain=.alcimo.com; Max-Age=2592000; SameSite=Lax${secure}`;
+  } catch {
+    // O parâmetro favoritesScope ainda permite sincronizar com a loja.
+  }
+
+  return scope;
+}
+
+export function getActiveCustomerFavoritesScope() {
+  if (typeof window === 'undefined') return '';
+
+  try {
+    const cookiePrefix = `${FAVORITES_SCOPE_COOKIE}=`;
+    const cookie = document.cookie
+      .split('; ')
+      .find((item) => item.startsWith(cookiePrefix));
+
+    if (cookie) {
+      return decodeURIComponent(cookie.slice(cookiePrefix.length));
+    }
+  } catch {
+    // Tenta o fallback abaixo.
+  }
+
+  try {
+    return window.sessionStorage.getItem(ACTIVE_SCOPE_SESSION_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function getScopedStorageKey(scope = '') {
+  const normalizedScope = String(scope || getActiveCustomerFavoritesScope()).trim();
+  return normalizedScope
+    ? `${ACCOUNT_FAVORITES_STORAGE_KEY}:${normalizedScope}`
+    : ACCOUNT_FAVORITES_STORAGE_KEY;
+}
+
+export function readAccountFavoriteIds(fallbackIds = [], scope = '') {
   const normalizedFallback = normalizeFavoriteIds(fallbackIds);
 
   if (typeof window === 'undefined') return normalizedFallback;
 
   try {
     const storedValue = window.sessionStorage.getItem(
-      ACCOUNT_FAVORITES_STORAGE_KEY,
+      getScopedStorageKey(scope),
     );
 
     if (storedValue === null) return normalizedFallback;
@@ -35,14 +95,14 @@ export function readAccountFavoriteIds(fallbackIds = []) {
   }
 }
 
-export function writeAccountFavoriteIds(favoriteIds) {
+export function writeAccountFavoriteIds(favoriteIds, scope = '') {
   const normalizedIds = normalizeFavoriteIds(favoriteIds);
 
   if (typeof window === 'undefined') return normalizedIds;
 
   try {
     window.sessionStorage.setItem(
-      ACCOUNT_FAVORITES_STORAGE_KEY,
+      getScopedStorageKey(scope),
       JSON.stringify(normalizedIds),
     );
   } catch {
@@ -52,11 +112,11 @@ export function writeAccountFavoriteIds(favoriteIds) {
   return normalizedIds;
 }
 
-export function clearAccountFavoriteIds() {
+export function clearAccountFavoriteIds(scope = '') {
   if (typeof window === 'undefined') return;
 
   try {
-    window.sessionStorage.removeItem(ACCOUNT_FAVORITES_STORAGE_KEY);
+    window.sessionStorage.removeItem(getScopedStorageKey(scope));
   } catch {
     // Ignora indisponibilidade do armazenamento.
   }
@@ -68,10 +128,12 @@ export function dispatchFavoritesChanged({
   isFavorite = false,
   favoriteIds = [],
   message = '',
+  scope = '',
 }) {
   if (typeof window === 'undefined') return;
 
-  const normalizedIds = writeAccountFavoriteIds(favoriteIds);
+  const activeScope = scope || getActiveCustomerFavoritesScope();
+  const normalizedIds = writeAccountFavoriteIds(favoriteIds, activeScope);
   const detail = {
     type,
     productId,
@@ -79,6 +141,7 @@ export function dispatchFavoritesChanged({
     favoriteIds: normalizedIds,
     favoritesCount: normalizedIds.length,
     message,
+    scope: activeScope,
   };
 
   window.dispatchEvent(new CustomEvent(FAVORITES_EVENT, {detail}));
@@ -113,24 +176,20 @@ export function subscribeToFavoritesChanged(callback) {
   };
 }
 
-const STORE_FAVORITES_RETURN_PARAMETER = 'favoritesSync';
-
 /**
  * Monta uma URL da loja levando a fotografia mais recente dos favoritos
- * da Área do Cliente. A loja consome o parâmetro `favoritesSync`, atualiza
- * o localStorage e remove o parâmetro da barra de endereço em seguida.
- *
- * Isso é necessário porque `conta.alcimo.com` e `alcimo.com` são origens
- * diferentes e, portanto, não compartilham sessionStorage/localStorage.
+ * da Área do Cliente. A fotografia agora também leva um escopo da conta,
+ * impedindo que dois clientes no mesmo navegador compartilhem favoritos.
  */
-export function buildStoreSyncUrl(destination, favoriteIds) {
+export function buildStoreSyncUrl(destination, favoriteIds, scope = '') {
   if (!destination) return '#';
   if (typeof window === 'undefined') return destination;
 
+  const activeScope = scope || getActiveCustomerFavoritesScope();
   const normalizedIds = normalizeFavoriteIds(
     Array.isArray(favoriteIds)
       ? favoriteIds
-      : readAccountFavoriteIds(),
+      : readAccountFavoriteIds([], activeScope),
   );
 
   try {
@@ -140,13 +199,20 @@ export function buildStoreSyncUrl(destination, favoriteIds) {
       JSON.stringify(normalizedIds),
     );
 
+    if (activeScope) {
+      destinationUrl.searchParams.set(
+        STORE_FAVORITES_SCOPE_PARAMETER,
+        activeScope,
+      );
+    }
+
     return destinationUrl.toString();
   } catch {
     return destination;
   }
 }
 
-export function handleStoreNavigation(event, destination, favoriteIds) {
+export function handleStoreNavigation(event, destination, favoriteIds, scope = '') {
   if (!destination || typeof window === 'undefined') return;
 
   if (
@@ -162,6 +228,6 @@ export function handleStoreNavigation(event, destination, favoriteIds) {
 
   event.preventDefault();
   window.location.assign(
-    buildStoreSyncUrl(destination, favoriteIds),
+    buildStoreSyncUrl(destination, favoriteIds, scope),
   );
 }

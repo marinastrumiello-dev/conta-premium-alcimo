@@ -29,6 +29,27 @@ export const FAVORITES_TYPE = 'json';
 export const FAVORITES_MAX_ITEMS = 100;
 
 /**
+ * Cria um escopo curto e estável para separar os favoritos de contas
+ * diferentes no mesmo navegador. Não é um token de autenticação.
+ *
+ * @param {unknown} customerId
+ * @returns {string}
+ */
+export function createCustomerFavoritesScope(customerId) {
+  const value = String(customerId || '');
+  if (!value) return '';
+
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return `c${(hash >>> 0).toString(36)}`;
+}
+
+
+/**
  * Converte o valor do metafield em uma lista segura de IDs.
  *
  * Aceita:

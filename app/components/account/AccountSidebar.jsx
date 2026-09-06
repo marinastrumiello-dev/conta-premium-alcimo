@@ -3,6 +3,7 @@ import {Form, NavLink} from 'react-router';
 import accountContent from '~/config/accountContent';
 import {getCustomerFavoriteIds} from '~/lib/favorites';
 import {
+  activateCustomerFavoritesScope,
   buildStoreSyncUrl,
   handleStoreNavigation,
   normalizeFavoriteIds,
@@ -47,20 +48,25 @@ export function AccountSidebar({customer}) {
   const [favoriteIds, setFavoriteIds] =
     useState(initialFavoriteIds);
 
+  const [favoritesScope, setFavoritesScope] =
+    useState('');
+
   /*
    * Ao abrir ou atualizar a Área do Cliente, o metafield vindo
    * do servidor é a fonte oficial. Nunca recuperamos uma lista
    * antiga do sessionStorage para substituir o servidor.
    */
   useEffect(() => {
+    const scope = activateCustomerFavoritesScope(customer?.id);
     const nextIds =
       normalizeFavoriteIds(
         initialFavoriteIds,
       );
 
+    setFavoritesScope(scope);
     setFavoriteIds(nextIds);
-    writeAccountFavoriteIds(nextIds);
-  }, [initialFavoriteIds]);
+    writeAccountFavoriteIds(nextIds, scope);
+  }, [customer?.id, initialFavoriteIds]);
 
   useEffect(() => {
     function handleFavoritesChange(event) {
@@ -73,7 +79,7 @@ export function AccountSidebar({customer}) {
           );
 
         setFavoriteIds(nextIds);
-        writeAccountFavoriteIds(nextIds);
+        writeAccountFavoriteIds(nextIds, favoritesScope);
         return;
       }
 
@@ -95,7 +101,7 @@ export function AccountSidebar({customer}) {
           ]);
         }
 
-        writeAccountFavoriteIds(nextIds);
+        writeAccountFavoriteIds(nextIds, favoritesScope);
         return nextIds;
       });
     }
@@ -111,7 +117,7 @@ export function AccountSidebar({customer}) {
         handleFavoritesChange,
       );
     };
-  }, []);
+  }, [favoritesScope]);
 
   const favoritesCount = favoriteIds.length;
 
@@ -120,20 +126,23 @@ export function AccountSidebar({customer}) {
       buildStoreSyncUrl(
         storeItem?.href,
         favoriteIds,
+        favoritesScope,
       ),
-    [storeItem?.href, favoriteIds],
+    [storeItem?.href, favoriteIds, favoritesScope],
   );
 
   function handleStoreReturn(event) {
     const latestFavoriteIds =
       writeAccountFavoriteIds(
         favoriteIds,
+        favoritesScope,
       );
 
     handleStoreNavigation(
       event,
       storeItem?.href,
       latestFavoriteIds,
+      favoritesScope,
     );
   }
 

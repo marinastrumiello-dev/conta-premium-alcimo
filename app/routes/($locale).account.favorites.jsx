@@ -1,4 +1,5 @@
-import {useLoaderData} from 'react-router';
+import {useEffect} from 'react';
+import {useLoaderData, useOutletContext} from 'react-router';
 import {EmptyFavorites} from '~/features/favorites/EmptyFavorites';
 import {FavoritesGrid} from '~/features/favorites/FavoritesGrid';
 import {FavoritesToast} from '~/features/favorites/FavoritesToast';
@@ -7,12 +8,16 @@ import {
   favoritesLoader,
 } from '~/features/favorites/favorites.server';
 import {useFavorites} from '~/features/favorites/useFavorites';
+import {createCustomerFavoritesScope} from '~/lib/favorites';
+import {dispatchFavoritesChanged} from '~/lib/favoritesSync';
 
 export const loader = favoritesLoader;
 export const action = favoritesAction;
 
 export default function AccountFavorites() {
-  const {products: initialProducts, productSaved} = useLoaderData();
+  const {products: initialProducts, favoriteIds, productSaved} = useLoaderData();
+  const {customer} = useOutletContext();
+  const favoritesScope = createCustomerFavoritesScope(customer?.id);
 
   const {
     products,
@@ -23,6 +28,14 @@ export default function AccountFavorites() {
     initialProducts,
     productSaved,
   });
+
+  useEffect(() => {
+    dispatchFavoritesChanged({
+      type: 'sync',
+      favoriteIds,
+      scope: favoritesScope,
+    });
+  }, [favoriteIds, favoritesScope]);
 
   return (
     <div className="pb-16">
