@@ -1,4 +1,4 @@
-import {Suspense, useState} from 'react';
+import {Suspense, useEffect, useState} from 'react';
 import {Await, NavLink, useMatches} from 'react-router';
 import {useAside} from '~/components/Aside';
 import accountContent from '~/config/accountContent';
@@ -177,6 +177,19 @@ export function HeaderMenu({viewport}) {
   );
 }
 
+function readSharedCartCount() {
+  if (typeof document === 'undefined') return 0;
+
+  const match = document.cookie
+    .split('; ')
+    .find((cookie) => cookie.startsWith('alcimo_cart_count='));
+
+  if (!match) return 0;
+
+  const value = Number.parseInt(decodeURIComponent(match.split('=')[1] || '0'), 10);
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
 /**
  * Ícones do cabeçalho.
  *
@@ -198,6 +211,32 @@ function HeaderCtas({
     customer?.firstName?.trim() ||
     customer?.displayName?.trim().split(/\s+/)[0] ||
     'Cliente';
+
+  const [sharedCartCount, setSharedCartCount] = useState(0);
+
+  useEffect(() => {
+    const syncSharedCartCount = () => {
+      setSharedCartCount(readSharedCartCount());
+    };
+
+    syncSharedCartCount();
+    window.addEventListener('pageshow', syncSharedCartCount);
+    window.addEventListener('focus', syncSharedCartCount);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncSharedCartCount();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pageshow', syncSharedCartCount);
+      window.removeEventListener('focus', syncSharedCartCount);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   return (
     <nav
@@ -269,6 +308,18 @@ function HeaderCtas({
         className="relative flex h-10 w-10 items-center justify-center !text-white no-underline transition hover:opacity-70"
       >
         <CartIcon />
+        {sharedCartCount > 0 ? (
+          <span
+            aria-label={
+              sharedCartCount === 1
+                ? '1 item no carrinho'
+                : `${sharedCartCount} itens no carrinho`
+            }
+            className="absolute -right-1 -top-1 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#a99470] px-1 text-[9px] font-medium leading-none text-white"
+          >
+            {sharedCartCount > 99 ? '99+' : sharedCartCount}
+          </span>
+        ) : null}
       </a>
     </nav>
   );
