@@ -1,6 +1,7 @@
 import {CartForm, Money} from '@shopify/hydrogen';
 import {useEffect, useId, useRef, useState} from 'react';
 import {useFetcher} from 'react-router';
+import {LaunchCheckoutNotice} from './LaunchCheckoutNotice';
 
 /**
  * @param {CartSummaryProps}
@@ -37,24 +38,17 @@ export function CartSummary({cart, layout}) {
         giftCardHeadingId={giftCardHeadingId}
         giftCardInputId={giftCardInputId}
       />
-      <CartCheckoutActions checkoutUrl={cart?.checkoutUrl} />
+      <CartCheckoutActions checkoutUrl={cart?.checkoutUrl} layout={layout} />
     </div>
   );
 }
 
 /**
- * @param {{checkoutUrl?: string}}
+ * @param {{checkoutUrl?: string; layout?: 'page' | 'aside'}}
  */
-function CartCheckoutActions({checkoutUrl}) {
-  if (!checkoutUrl) return null;
-
+function CartCheckoutActions({checkoutUrl, layout}) {
   return (
-    <div>
-      <a href={checkoutUrl} target="_self">
-        <p>Continue to Checkout &rarr;</p>
-      </a>
-      <br />
-    </div>
+    <LaunchCheckoutNotice checkoutUrl={checkoutUrl} layout={layout} />
   );
 }
 
