@@ -13,17 +13,15 @@ import {
   addFavoriteProduct,
   createCustomerFavoritesScope,
   isShopifyProductId,
+  parseAccountState,
   parseFavoriteIds,
+  stringifyAccountState,
   stringifyFavoriteIds,
   toggleFavoriteProduct,
 } from '~/lib/favorites';
 import {
-  SAVED_CART_KEY,
-  SAVED_CART_NAMESPACE,
-  SAVED_CART_TYPE,
   mergeSavedCartItems,
   normalizeSavedCartItems,
-  parseSavedCartItems,
   stringifySavedCartItems,
 } from '~/lib/savedCart';
 
@@ -71,8 +69,9 @@ export async function favoritesLoader({
       return redirect('/account/favorites');
     }
 
-    const currentFavoriteIds = parseFavoriteIds(customer.favorites?.value);
-    const currentCartItems = parseSavedCartItems(customer.savedCart?.value);
+    const currentAccountState = parseAccountState(customer.favorites?.value);
+    const currentFavoriteIds = currentAccountState.favorites;
+    const currentCartItems = normalizeSavedCartItems(currentAccountState.cart);
 
     const nextFavoriteIds =
       storeSync.mode === 'sync'
@@ -129,9 +128,17 @@ export async function favoritesLoader({
         customerAccount,
       );
 
-    const currentFavoriteIds =
-      parseFavoriteIds(
+    const currentAccountState =
+      parseAccountState(
         customer.favorites?.value,
+      );
+
+    const currentFavoriteIds =
+      currentAccountState.favorites;
+
+    const currentCartItems =
+      normalizeSavedCartItems(
+        currentAccountState.cart,
       );
 
     const nextFavoriteIds =
@@ -148,6 +155,7 @@ export async function favoritesLoader({
         customerAccount,
         customerId: customer.id,
         favoriteIds: nextFavoriteIds,
+        cartItems: currentCartItems,
       });
     }
 
@@ -161,9 +169,12 @@ export async function favoritesLoader({
       customerAccount,
     );
 
-  const favoriteIds = parseFavoriteIds(
+  const accountState = parseAccountState(
     customer.favorites?.value,
   );
+
+  const favoriteIds = accountState.favorites;
+  const savedCartItems = normalizeSavedCartItems(accountState.cart);
 
   if (!favoriteIds.length) {
     return createLoaderResponse({
@@ -218,6 +229,7 @@ export async function favoritesLoader({
       customerAccount,
       customerId: customer.id,
       favoriteIds: validFavoriteIds,
+      cartItems: savedCartItems,
     });
   }
 
@@ -277,9 +289,17 @@ export async function favoritesAction({
         customerAccount,
       );
 
-    const currentFavoriteIds =
-      parseFavoriteIds(
+    const currentAccountState =
+      parseAccountState(
         customer.favorites?.value,
+      );
+
+    const currentFavoriteIds =
+      currentAccountState.favorites;
+
+    const currentCartItems =
+      normalizeSavedCartItems(
+        currentAccountState.cart,
       );
 
     const result = toggleFavoriteProduct(
@@ -292,6 +312,7 @@ export async function favoritesAction({
       customerId: customer.id,
       favoriteIds:
         result.favoriteIds,
+      cartItems: currentCartItems,
     });
 
     return remixData({
@@ -486,33 +507,26 @@ async function saveCustomerAccountState({
   saveFavorites = true,
   saveCart = true,
 }) {
-  const metafields = [];
-
-  if (saveFavorites) {
-    metafields.push({
-      ownerId: customerId,
-      namespace: FAVORITES_NAMESPACE,
-      key: FAVORITES_KEY,
-      type: FAVORITES_TYPE,
-      value: stringifyFavoriteIds(favoriteIds),
-    });
-  }
-
-  if (saveCart) {
-    metafields.push({
-      ownerId: customerId,
-      namespace: SAVED_CART_NAMESPACE,
-      key: SAVED_CART_KEY,
-      type: SAVED_CART_TYPE,
-      value: stringifySavedCartItems(cartItems),
-    });
-  }
-
-  if (!metafields.length) return [];
+  if (!saveFavorites && !saveCart) return [];
 
   const result = await customerAccount.mutate(
     CUSTOMER_FAVORITES_MUTATION,
-    {variables: {metafields}},
+    {
+      variables: {
+        metafields: [
+          {
+            ownerId: customerId,
+            namespace: FAVORITES_NAMESPACE,
+            key: FAVORITES_KEY,
+            type: FAVORITES_TYPE,
+            value: stringifyAccountState(
+              favoriteIds,
+              normalizeSavedCartItems(cartItems),
+            ),
+          },
+        ],
+      },
+    },
   );
 
   const graphqlErrors = result?.errors || [];
@@ -533,6 +547,7 @@ async function saveCustomerFavorites({
   customerAccount,
   customerId,
   favoriteIds,
+  cartItems = [],
 }) {
   const result =
     await customerAccount.mutate(
@@ -547,8 +562,9 @@ async function saveCustomerFavorites({
               key: FAVORITES_KEY,
               type: FAVORITES_TYPE,
               value:
-                stringifyFavoriteIds(
+                stringifyAccountState(
                   favoriteIds,
+                  normalizeSavedCartItems(cartItems),
                 ),
             },
           ],

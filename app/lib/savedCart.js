@@ -39,5 +39,21 @@ export function savedCartItemCount(items) {
 }
 
 export function getCustomerSavedCartItems(customer) {
+  // Formato atual: carrinho e favoritos vivem juntos no metafield
+  // custom.favoritos_alcimo. Isso evita depender de um segundo metafield
+  // e mantém compatibilidade com contas que ainda têm o formato antigo.
+  const rawValue = customer?.favorites?.value;
+
+  if (rawValue) {
+    try {
+      const parsed = typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
+      if (parsed && !Array.isArray(parsed) && typeof parsed === 'object') {
+        return normalizeSavedCartItems(parsed.cart);
+      }
+    } catch {
+      // Continua para o fallback legado abaixo.
+    }
+  }
+
   return parseSavedCartItems(customer?.savedCart?.value);
 }

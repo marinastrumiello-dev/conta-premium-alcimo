@@ -61,8 +61,10 @@ export function createCustomerFavoritesScope(customerId) {
  * @param {unknown} value
  * @returns {string[]}
  */
-export function parseFavoriteIds(value) {
-  if (!value) return [];
+export function parseAccountState(value) {
+  if (!value) {
+    return {favorites: [], cart: []};
+  }
 
   let parsedValue = value;
 
@@ -70,16 +72,41 @@ export function parseFavoriteIds(value) {
     try {
       parsedValue = JSON.parse(value);
     } catch (error) {
-      console.error('Invalid favorites metafield JSON:', error);
-      return [];
+      console.error('Invalid ALCIMO account state JSON:', error);
+      return {favorites: [], cart: []};
     }
   }
 
-  if (!Array.isArray(parsedValue)) {
-    return [];
+  // Compatibilidade com o formato antigo: o metafield era apenas um array
+  // contendo os IDs dos produtos favoritos.
+  if (Array.isArray(parsedValue)) {
+    return {
+      favorites: normalizeFavoriteIds(parsedValue),
+      cart: [],
+    };
   }
 
-  return normalizeFavoriteIds(parsedValue);
+  if (!parsedValue || typeof parsedValue !== 'object') {
+    return {favorites: [], cart: []};
+  }
+
+  return {
+    favorites: normalizeFavoriteIds(
+      parsedValue.favorites ?? parsedValue.favoriteIds ?? [],
+    ),
+    cart: Array.isArray(parsedValue.cart) ? parsedValue.cart : [],
+  };
+}
+
+export function stringifyAccountState(favoriteIds, cartItems = []) {
+  return JSON.stringify({
+    favorites: normalizeFavoriteIds(favoriteIds),
+    cart: Array.isArray(cartItems) ? cartItems : [],
+  });
+}
+
+export function parseFavoriteIds(value) {
+  return parseAccountState(value).favorites;
 }
 
 /**
