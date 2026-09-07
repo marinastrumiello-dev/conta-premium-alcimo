@@ -208,6 +208,29 @@ export function readCustomerCartSnapshot() {
   }
 }
 
+
+function readSharedBrowserCartCount() {
+  if (typeof document === 'undefined') return 0;
+
+  try {
+    const prefix = 'alcimo_cart_count=';
+    const cookie = document.cookie
+      .split('; ')
+      .find((item) => item.startsWith(prefix));
+
+    if (!cookie) return 0;
+
+    const value = Number.parseInt(
+      decodeURIComponent(cookie.slice(prefix.length) || '0'),
+      10,
+    );
+
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * Monta uma URL da loja levando a fotografia mais recente dos favoritos
  * da Área do Cliente. A fotografia agora também leva um escopo da conta,
@@ -238,10 +261,23 @@ export function buildStoreSyncUrl(destination, favoriteIds, scope = '') {
       );
     }
 
-    destinationUrl.searchParams.set(
-      STORE_CART_RESTORE_PARAMETER,
-      JSON.stringify(readCustomerCartSnapshot()),
-    );
+    const accountCartSnapshot = readCustomerCartSnapshot();
+    const browserCartCount = readSharedBrowserCartCount();
+
+    // Só manda o carrinho salvo da conta para restauração quando o
+    // carrinho atual da loja estiver realmente vazio. Durante a navegação
+    // normal Loja -> Perfil -> Loja, o carrinho da Shopify já continua
+    // existente no navegador e não deve ser somado/restaurado novamente.
+    if (browserCartCount === 0 && accountCartSnapshot.length > 0) {
+      destinationUrl.searchParams.set(
+        STORE_CART_RESTORE_PARAMETER,
+        JSON.stringify(accountCartSnapshot),
+      );
+    } else {
+      destinationUrl.searchParams.delete(
+        STORE_CART_RESTORE_PARAMETER,
+      );
+    }
 
     return destinationUrl.toString();
   } catch {
