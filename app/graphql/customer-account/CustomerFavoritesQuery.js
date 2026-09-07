@@ -21,6 +21,18 @@ export const CUSTOMER_FAVORITES_QUERY = `#graphql
         value
         compareDigest
       }
+
+      savedCart: metafield(
+        namespace: "custom"
+        key: "carrinho_alcimo"
+      ) {
+        id
+        namespace
+        key
+        type
+        value
+        compareDigest
+      }
     }
   }
 `;

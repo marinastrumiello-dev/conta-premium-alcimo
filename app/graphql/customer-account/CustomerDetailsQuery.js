@@ -37,6 +37,18 @@ export const CUSTOMER_FRAGMENT = `#graphql
       compareDigest
     }
 
+    savedCart: metafield(
+      namespace: "custom"
+      key: "carrinho_alcimo"
+    ) {
+      id
+      namespace
+      key
+      type
+      value
+      compareDigest
+    }
+
     orders(first: 1, reverse: true) {
       nodes {
         id

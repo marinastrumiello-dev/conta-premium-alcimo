@@ -1,4 +1,5 @@
 import {createCustomerFavoritesScope} from '~/lib/favorites';
+import {normalizeSavedCartItems} from '~/lib/savedCart';
 
 const ACCOUNT_FAVORITES_STORAGE_KEY = 'alcimo:account-favorites';
 const ACTIVE_SCOPE_SESSION_KEY = 'alcimo:account-favorites:active-scope';
@@ -8,6 +9,8 @@ const FAVORITES_CHANNEL = 'alcimo:favorites';
 const SHOPIFY_PRODUCT_GID_PREFIX = 'gid://shopify/Product/';
 const STORE_FAVORITES_RETURN_PARAMETER = 'favoritesSync';
 const STORE_FAVORITES_SCOPE_PARAMETER = 'favoritesScope';
+const STORE_CART_RESTORE_PARAMETER = 'cartRestore';
+const ACCOUNT_CART_COOKIE = 'alcimo_account_cart';
 
 export function normalizeFavoriteIds(favoriteIds) {
   if (!Array.isArray(favoriteIds)) return [];
@@ -176,6 +179,35 @@ export function subscribeToFavoritesChanged(callback) {
   };
 }
 
+export function activateCustomerCartSnapshot(cartItems) {
+  if (typeof document === 'undefined') return normalizeSavedCartItems(cartItems);
+
+  const normalizedItems = normalizeSavedCartItems(cartItems);
+
+  try {
+    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+    const value = encodeURIComponent(JSON.stringify(normalizedItems));
+    document.cookie = `${ACCOUNT_CART_COOKIE}=${value}; Path=/; Domain=.alcimo.com; Max-Age=2592000; SameSite=Lax${secure}`;
+  } catch {
+    // Continua funcionando mesmo sem cookie compartilhado.
+  }
+
+  return normalizedItems;
+}
+
+export function readCustomerCartSnapshot() {
+  if (typeof document === 'undefined') return [];
+
+  try {
+    const prefix = `${ACCOUNT_CART_COOKIE}=`;
+    const cookie = document.cookie.split('; ').find((item) => item.startsWith(prefix));
+    if (!cookie) return [];
+    return normalizeSavedCartItems(JSON.parse(decodeURIComponent(cookie.slice(prefix.length))));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Monta uma URL da loja levando a fotografia mais recente dos favoritos
  * da Área do Cliente. A fotografia agora também leva um escopo da conta,
@@ -205,6 +237,11 @@ export function buildStoreSyncUrl(destination, favoriteIds, scope = '') {
         activeScope,
       );
     }
+
+    destinationUrl.searchParams.set(
+      STORE_CART_RESTORE_PARAMETER,
+      JSON.stringify(readCustomerCartSnapshot()),
+    );
 
     return destinationUrl.toString();
   } catch {

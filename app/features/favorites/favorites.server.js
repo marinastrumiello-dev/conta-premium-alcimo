@@ -17,6 +17,15 @@ import {
   stringifyFavoriteIds,
   toggleFavoriteProduct,
 } from '~/lib/favorites';
+import {
+  SAVED_CART_KEY,
+  SAVED_CART_NAMESPACE,
+  SAVED_CART_TYPE,
+  mergeSavedCartItems,
+  normalizeSavedCartItems,
+  parseSavedCartItems,
+  stringifySavedCartItems,
+} from '~/lib/savedCart';
 
 export async function favoritesLoader({
   request,
@@ -31,6 +40,7 @@ export async function favoritesLoader({
     requestUrl.searchParams.get('add');
 
   const storeSync = getStoreSync(requestUrl);
+  const cartSync = getCartSync(requestUrl);
 
   /*
    * Recebe a fotografia local enviada pelo header da loja.
@@ -62,23 +72,40 @@ export async function favoritesLoader({
     }
 
     const currentFavoriteIds = parseFavoriteIds(customer.favorites?.value);
+    const currentCartItems = parseSavedCartItems(customer.savedCart?.value);
 
     const nextFavoriteIds =
       storeSync.mode === 'sync'
         ? storeSync.favoriteIds
         : mergeFavoriteIds(currentFavoriteIds, storeSync.favoriteIds);
 
+    const nextCartItems =
+      cartSync === null
+        ? currentCartItems
+        : storeSync.mode === 'sync'
+          ? cartSync
+          : mergeSavedCartItems(currentCartItems, cartSync);
+
     const favoritesChanged = !areFavoriteListsEqual(
       currentFavoriteIds,
       nextFavoriteIds,
     );
+    const cartChanged = !areSavedCartsEqual(currentCartItems, nextCartItems);
 
-    if (favoritesChanged) {
-      await saveCustomerFavorites({
+    if (favoritesChanged || cartChanged) {
+      await saveCustomerAccountState({
         customerAccount,
         customerId: customer.id,
         favoriteIds: nextFavoriteIds,
+        cartItems: nextCartItems,
+        saveFavorites: favoritesChanged,
+        saveCart: cartChanged,
       });
+    }
+
+    const returnTo = getSafeAccountReturnPath(requestUrl);
+    if (returnTo !== '/account/favorites') {
+      return redirect(returnTo);
     }
 
     return redirect(
@@ -351,6 +378,34 @@ function getStoreSync(requestUrl) {
  * Os IDs existentes são mantidos e os novos
  * são adicionados sem duplicação.
  */
+function getCartSync(requestUrl) {
+  if (!requestUrl.searchParams.has('cartSync')) return null;
+
+  const rawValue = requestUrl.searchParams.get('cartSync');
+  if (!rawValue) return [];
+
+  try {
+    return normalizeSavedCartItems(JSON.parse(rawValue));
+  } catch (error) {
+    console.error('Cart sync parse error:', error);
+    return [];
+  }
+}
+
+function getSafeAccountReturnPath(requestUrl) {
+  const rawPath = String(requestUrl.searchParams.get('returnTo') || '').trim();
+
+  if (!rawPath.startsWith('/account') || rawPath.startsWith('//')) {
+    return '/account/favorites';
+  }
+
+  return rawPath;
+}
+
+function areSavedCartsEqual(firstItems, secondItems) {
+  return stringifySavedCartItems(firstItems) === stringifySavedCartItems(secondItems);
+}
+
 function mergeFavoriteIds(
   currentFavoriteIds,
   syncedFavoriteIds,
@@ -421,6 +476,57 @@ async function getCustomerWithFavorites(
   }
 
   return customer;
+}
+
+async function saveCustomerAccountState({
+  customerAccount,
+  customerId,
+  favoriteIds,
+  cartItems,
+  saveFavorites = true,
+  saveCart = true,
+}) {
+  const metafields = [];
+
+  if (saveFavorites) {
+    metafields.push({
+      ownerId: customerId,
+      namespace: FAVORITES_NAMESPACE,
+      key: FAVORITES_KEY,
+      type: FAVORITES_TYPE,
+      value: stringifyFavoriteIds(favoriteIds),
+    });
+  }
+
+  if (saveCart) {
+    metafields.push({
+      ownerId: customerId,
+      namespace: SAVED_CART_NAMESPACE,
+      key: SAVED_CART_KEY,
+      type: SAVED_CART_TYPE,
+      value: stringifySavedCartItems(cartItems),
+    });
+  }
+
+  if (!metafields.length) return [];
+
+  const result = await customerAccount.mutate(
+    CUSTOMER_FAVORITES_MUTATION,
+    {variables: {metafields}},
+  );
+
+  const graphqlErrors = result?.errors || [];
+  const userErrors = result?.data?.metafieldsSet?.userErrors || [];
+
+  if (graphqlErrors.length || userErrors.length) {
+    console.error('Customer state mutation errors:', {graphqlErrors, userErrors});
+    throw new Error(
+      userErrors[0]?.message ||
+        'Não foi possível salvar as informações da sua conta.',
+    );
+  }
+
+  return result?.data?.metafieldsSet?.metafields || [];
 }
 
 async function saveCustomerFavorites({

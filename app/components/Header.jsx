@@ -2,6 +2,7 @@ import {Suspense, useEffect, useState} from 'react';
 import {Await, NavLink, useMatches} from 'react-router';
 import {useAside} from '~/components/Aside';
 import accountContent from '~/config/accountContent';
+import {getCustomerSavedCartItems, savedCartItemCount} from '~/lib/savedCart';
 import {
   buildStoreSyncUrl,
   handleStoreNavigation,
@@ -212,11 +213,15 @@ function HeaderCtas({
     customer?.displayName?.trim().split(/\s+/)[0] ||
     'Cliente';
 
-  const [sharedCartCount, setSharedCartCount] = useState(0);
+  const accountCartCount = savedCartItemCount(
+    getCustomerSavedCartItems(customer),
+  );
+  const [sharedCartCount, setSharedCartCount] = useState(accountCartCount);
 
   useEffect(() => {
     const syncSharedCartCount = () => {
-      setSharedCartCount(readSharedCartCount());
+      const browserCount = readSharedCartCount();
+      setSharedCartCount(browserCount || accountCartCount);
     };
 
     syncSharedCartCount();
@@ -236,7 +241,7 @@ function HeaderCtas({
       window.removeEventListener('focus', syncSharedCartCount);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [accountCartCount]);
 
   return (
     <nav

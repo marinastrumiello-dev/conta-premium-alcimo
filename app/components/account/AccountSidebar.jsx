@@ -2,7 +2,9 @@ import {useEffect, useMemo, useState} from 'react';
 import {Form, NavLink} from 'react-router';
 import accountContent from '~/config/accountContent';
 import {getCustomerFavoriteIds} from '~/lib/favorites';
+import {getCustomerSavedCartItems} from '~/lib/savedCart';
 import {
+  activateCustomerCartSnapshot,
   activateCustomerFavoritesScope,
   buildStoreSyncUrl,
   handleStoreNavigation,
@@ -66,7 +68,8 @@ export function AccountSidebar({customer}) {
     setFavoritesScope(scope);
     setFavoriteIds(nextIds);
     writeAccountFavoriteIds(nextIds, scope);
-  }, [customer?.id, initialFavoriteIds]);
+    activateCustomerCartSnapshot(getCustomerSavedCartItems(customer));
+  }, [customer, customer?.id, initialFavoriteIds]);
 
   useEffect(() => {
     function handleFavoritesChange(event) {
