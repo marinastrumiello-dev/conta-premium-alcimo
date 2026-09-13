@@ -179,16 +179,16 @@ export function HeaderMenu({viewport}) {
 }
 
 function readSharedCartCount() {
-  if (typeof document === 'undefined') return 0;
+  if (typeof document === 'undefined') return null;
 
   const match = document.cookie
     .split('; ')
     .find((cookie) => cookie.startsWith('alcimo_cart_count='));
 
-  if (!match) return 0;
+  if (!match) return null;
 
   const value = Number.parseInt(decodeURIComponent(match.split('=')[1] || '0'), 10);
-  return Number.isFinite(value) && value > 0 ? value : 0;
+  return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 /**
@@ -221,7 +221,7 @@ function HeaderCtas({
   useEffect(() => {
     const syncSharedCartCount = () => {
       const browserCount = readSharedCartCount();
-      setSharedCartCount(browserCount || accountCartCount);
+      setSharedCartCount(browserCount ?? accountCartCount);
     };
 
     syncSharedCartCount();
